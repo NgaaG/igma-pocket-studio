@@ -21,7 +21,7 @@ serve(async (req) => {
     const params = new URLSearchParams({
       client_id: FIGMA_CLIENT_ID,
       redirect_uri,
-      scope: "file_read",
+      scope: "files:read",
       state: state || crypto.randomUUID(),
       response_type: "code",
     });
