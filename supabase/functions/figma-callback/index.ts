@@ -13,6 +13,8 @@ serve(async (req) => {
 
   try {
     const { code, redirect_uri } = await req.json();
+    
+    console.log("Callback received:", { code: code?.substring(0, 10) + "...", redirect_uri });
 
     const FIGMA_CLIENT_ID = Deno.env.get("FIGMA_CLIENT_ID");
     const FIGMA_CLIENT_SECRET = Deno.env.get("FIGMA_CLIENT_SECRET");
@@ -20,8 +22,11 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!FIGMA_CLIENT_ID || !FIGMA_CLIENT_SECRET) {
+      console.error("Missing Figma credentials:", { hasClientId: !!FIGMA_CLIENT_ID, hasClientSecret: !!FIGMA_CLIENT_SECRET });
       throw new Error("Figma credentials not configured");
     }
+
+    console.log("Exchanging code for tokens with client_id:", FIGMA_CLIENT_ID);
 
     // Exchange code for tokens
     const tokenResponse = await fetch("https://api.figma.com/v1/oauth/token", {
@@ -38,14 +43,18 @@ serve(async (req) => {
       }),
     });
 
+    const tokenText = await tokenResponse.text();
+    console.log("Figma token response status:", tokenResponse.status);
+    
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error("Figma token error:", errorText);
-      throw new Error("Failed to exchange code for token");
+      console.error("Figma token error:", tokenText);
+      throw new Error(`Failed to exchange code for token: ${tokenText}`);
     }
 
-    const tokens = await tokenResponse.json();
+    const tokens = JSON.parse(tokenText);
     const { access_token, refresh_token, expires_in } = tokens;
+    
+    console.log("Token exchange successful, expires_in:", expires_in);
 
     // Get user info from Figma
     const userResponse = await fetch("https://api.figma.com/v1/me", {
