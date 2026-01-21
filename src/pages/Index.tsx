@@ -101,11 +101,19 @@ const Index = () => {
               }
             />
           ) : (
-            <div className="px-4 py-8 text-center">
-              <p className="text-muted-foreground text-sm">No recent files found</p>
+            <div className="px-4 py-8 text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-muted/50 rounded-2xl flex items-center justify-center">
+                <Search className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-foreground font-medium">No files yet</p>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                  Open a Figma file link to add it to your library, or paste a file URL above.
+                </p>
+              </div>
               <button 
                 onClick={refetch}
-                className="mt-2 text-primary text-sm font-medium hover:underline"
+                className="text-primary text-sm font-medium hover:underline"
               >
                 Refresh
               </button>
