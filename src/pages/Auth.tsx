@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,10 +8,11 @@ import { toast } from "@/hooks/use-toast";
 
 export default function Auth() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isLoading } = useAuth();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+  const processingRef = useRef(false);
 
   // Handle OAuth callback
   useEffect(() => {
@@ -19,17 +20,26 @@ export default function Auth() {
     const state = searchParams.get("state");
     const storedState = sessionStorage.getItem("figma_oauth_state");
 
-    if (code && state) {
+    // Prevent double processing (React Strict Mode can cause this)
+    if (code && state && !processingRef.current) {
       if (state !== storedState) {
         toast({
           title: "Authentication Error",
           description: "Invalid state parameter. Please try again.",
           variant: "destructive",
         });
+        // Clear the URL params
+        setSearchParams({});
         return;
       }
 
+      processingRef.current = true;
       setIsProcessingCallback(true);
+      
+      // Clear the code from URL immediately to prevent reuse
+      setSearchParams({});
+      sessionStorage.removeItem("figma_oauth_state");
+      
       handleOAuthCallback(code);
     }
   }, [searchParams]);
