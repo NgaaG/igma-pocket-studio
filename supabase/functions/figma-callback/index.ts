@@ -57,15 +57,19 @@ serve(async (req) => {
     console.log("Token exchange successful, expires_in:", expires_in);
 
     // Get user info from Figma
+    console.log("Fetching user info with token:", access_token?.substring(0, 10) + "...");
     const userResponse = await fetch("https://api.figma.com/v1/me", {
       headers: { Authorization: `Bearer ${access_token}` },
     });
 
-    if (!userResponse.ok) {
-      throw new Error("Failed to get Figma user info");
-    }
+    const userText = await userResponse.text();
+    console.log("User info response status:", userResponse.status, "body:", userText);
 
-    const figmaUser = await userResponse.json();
+    if (!userResponse.ok) {
+      throw new Error(`Failed to get Figma user info: ${userText}`);
+    }
+    
+    const figmaUser = JSON.parse(userText);
     const { id: figma_id, email, handle: name, img_url: avatar_url } = figmaUser;
 
     // Create Supabase client with service role
