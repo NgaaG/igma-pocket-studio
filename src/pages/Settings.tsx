@@ -9,7 +9,10 @@ import {
   ChevronRight,
   Download
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 const settingsSections = [
   {
@@ -36,18 +39,55 @@ const settingsSections = [
 ];
 
 const SettingsPage = () => {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out",
+        description: "You've been signed out successfully.",
+      });
+      navigate("/auth");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const displayName = profile?.name || user?.email?.split("@")[0] || "User";
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <MobileLayout title="Settings" showSync={false}>
       <div className="space-y-6 py-4">
         {/* Profile card */}
         <div className="px-4 animate-fade-in">
           <div className="p-4 bg-card rounded-2xl border border-border/50 shadow-soft flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-xl font-semibold text-primary">JD</span>
-            </div>
+            {profile?.avatar_url ? (
+              <img 
+                src={profile.avatar_url} 
+                alt={displayName}
+                className="w-14 h-14 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                <span className="text-xl font-semibold text-primary">{initials}</span>
+              </div>
+            )}
             <div className="flex-1">
-              <p className="font-semibold text-foreground">Jane Designer</p>
-              <p className="text-sm text-muted-foreground">jane@design.studio</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-sm text-muted-foreground">{user?.email || profile?.email}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </div>
@@ -92,7 +132,10 @@ const SettingsPage = () => {
 
         {/* Sign out */}
         <div className="px-4 animate-fade-in" style={{ animationDelay: "200ms" }}>
-          <button className="w-full flex items-center justify-center gap-2 p-4 text-destructive font-medium hover:bg-destructive/10 rounded-2xl transition-colors active:scale-[0.99]">
+          <button 
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center gap-2 p-4 text-destructive font-medium hover:bg-destructive/10 rounded-2xl transition-colors active:scale-[0.99]"
+          >
             <LogOut className="w-5 h-5" />
             <span>Sign Out</span>
           </button>

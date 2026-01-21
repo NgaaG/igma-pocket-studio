@@ -48,7 +48,7 @@ serve(async (req) => {
       const FIGMA_CLIENT_ID = Deno.env.get("FIGMA_CLIENT_ID");
       const FIGMA_CLIENT_SECRET = Deno.env.get("FIGMA_CLIENT_SECRET");
 
-      const refreshResponse = await fetch("https://www.figma.com/api/oauth/refresh", {
+      const refreshResponse = await fetch("https://api.figma.com/v1/oauth/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -73,30 +73,58 @@ serve(async (req) => {
       }).eq("user_id", user.id);
     }
 
-    // Fetch recent files from Figma
-    const filesResponse = await fetch("https://api.figma.com/v1/me/files/recent", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    // First, get the user's profile to check for any cached files
+    const { data: cachedFiles } = await supabase
+      .from("cached_files")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("last_accessed_at", { ascending: false })
+      .limit(20);
 
-    if (!filesResponse.ok) {
-      const errorText = await filesResponse.text();
-      console.error("Figma files error:", errorText);
-      throw new Error("Failed to fetch Figma files");
+    // Try to get files from Figma - use /v1/files endpoint with specific file keys if we have cached ones
+    // Otherwise, return empty and let user add files manually or through search
+    const files: any[] = [];
+
+    // If we have cached file keys, fetch their current data from Figma
+    if (cachedFiles && cachedFiles.length > 0) {
+      for (const cachedFile of cachedFiles) {
+        try {
+          const fileResponse = await fetch(`https://api.figma.com/v1/files/${cachedFile.figma_file_key}?depth=1`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+
+          if (fileResponse.ok) {
+            const fileData = await fileResponse.json();
+            files.push({
+              key: cachedFile.figma_file_key,
+              name: fileData.name || cachedFile.title,
+              thumbnail_url: fileData.thumbnailUrl || cachedFile.thumbnail_url,
+              last_modified: fileData.lastModified,
+              editor_type: fileData.editorType || cachedFile.file_type,
+              is_bookmarked: cachedFile.is_bookmarked,
+            });
+          }
+        } catch (e) {
+          // If individual file fetch fails, use cached data
+          files.push({
+            key: cachedFile.figma_file_key,
+            name: cachedFile.title,
+            thumbnail_url: cachedFile.thumbnail_url,
+            last_modified: cachedFile.last_accessed_at,
+            editor_type: cachedFile.file_type,
+            is_bookmarked: cachedFile.is_bookmarked,
+          });
+        }
+      }
     }
 
-    const filesData = await filesResponse.json();
-
-    // Transform to our format
-    const files = filesData.files?.map((file: any) => ({
-      key: file.key,
-      name: file.name,
-      thumbnail_url: file.thumbnail_url,
-      last_modified: file.last_modified,
-      editor_type: file.editor_type, // "figma" or "figjam"
-    })) || [];
+    console.log(`Returning ${files.length} files for user ${user.id}`);
 
     return new Response(
-      JSON.stringify({ files }),
+      JSON.stringify({ 
+        files,
+        message: files.length === 0 ? "No files yet. Open a Figma file link to add it to your library." : undefined
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
